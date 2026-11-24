@@ -1,5 +1,5 @@
 
-package dev.leelakh.cricket_sql.conztraints;
+package dev.leelakh.cricket_sql;
 
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
