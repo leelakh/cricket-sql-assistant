@@ -1,0 +1,364 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cricket SQL Assistant</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 40px 20px;
+            font-family: Arial, sans-serif;
+            background: #f4f6f9;
+            color: #202938;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: auto;
+        }
+
+        h1 {
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: #64748b;
+            margin-bottom: 30px;
+        }
+
+        .search-box {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+        }
+
+        input {
+            flex: 1;
+            padding: 14px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+
+        button {
+            padding: 14px 24px;
+            border: none;
+            border-radius: 8px;
+            background: #2563eb;
+            color: white;
+            font-size: 15px;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            background: #94a3b8;
+            cursor: wait;
+        }
+
+        .card {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            margin-bottom: 20px;
+        }
+
+        .status {
+            color: #64748b;
+            margin-bottom: 15px;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 13px;
+            border-bottom: 1px solid #e2e8f0;
+            text-align: left;
+        }
+
+        th {
+            background: #f1f5f9;
+            text-transform: capitalize;
+        }
+
+        tbody tr:hover {
+            background: #f8fafc;
+        }
+
+        .sql-section {
+            margin: 20px 0;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 15px;
+            background: #f8fafc;
+        }
+
+        .sql-section summary {
+            cursor: pointer;
+            font-weight: bold;
+            color: #2563eb;
+        }
+
+        .sql-section pre {
+            margin-top: 15px;
+            padding: 15px;
+            background: #1e293b;
+            color: #e2e8f0;
+            border-radius: 8px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .error {
+            color: #dc2626;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .empty-message {
+            color: #64748b;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading {
+            color: #2563eb;
+            margin-bottom: 15px;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 20px 12px;
+            }
+
+            .search-box {
+                flex-direction: column;
+            }
+
+            button {
+                width: 100%;
+            }
+
+            .card {
+                padding: 16px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>🏏 Cricket SQL Assistant</h1>
+
+    <p class="subtitle">
+        Ask questions about IPL cricket statistics using AI.
+    </p>
+
+    <div class="search-box">
+        <input
+                type="text"
+                id="question"
+                placeholder="Example: Who are the top 10 IPL run scorers?"
+        >
+
+        <button id="askButton" onclick="askQuestion()">
+            Ask AI
+        </button>
+    </div>
+
+    <p id="loading" class="loading hidden">
+        AI is analysing your question and generating SQL...
+    </p>
+
+    <div id="resultCard" class="card hidden">
+
+        <h3 id="questionTitle"></h3>
+
+        <p id="status" class="status"></p>
+
+        <details class="sql-section">
+            <summary>View generated SQL</summary>
+            <pre id="generatedSql"></pre>
+        </details>
+
+        <div class="table-wrapper">
+            <table>
+                <thead id="tableHeader"></thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+
+        <p id="emptyMessage" class="empty-message hidden">
+            No records found for this question.
+        </p>
+
+    </div>
+
+    <div id="error" class="card error hidden"></div>
+
+</div>
+
+<script>
+
+    async function askQuestion() {
+
+        const questionInput = document.getElementById("question");
+        const askButton = document.getElementById("askButton");
+        const loading = document.getElementById("loading");
+
+        const question = questionInput.value.trim();
+
+        if (!question) {
+            alert("Please enter a cricket question.");
+            return;
+        }
+
+        askButton.disabled = true;
+        askButton.textContent = "Thinking...";
+
+        loading.classList.remove("hidden");
+        document.getElementById("resultCard").classList.add("hidden");
+        document.getElementById("error").classList.add("hidden");
+
+        try {
+
+            const response = await fetch("/api/cricket/ask", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    question: question
+                })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || "Unable to process question.");
+            }
+
+            displayResults(data);
+
+        } catch (error) {
+
+            const errorElement = document.getElementById("error");
+            errorElement.textContent = error.message;
+            errorElement.classList.remove("hidden");
+
+        } finally {
+
+            askButton.disabled = false;
+            askButton.textContent = "Ask AI";
+            loading.classList.add("hidden");
+
+        }
+    }
+
+    function displayResults(data) {
+
+        const results = data.results || [];
+
+        document.getElementById("questionTitle").textContent =
+            data.question;
+
+        document.getElementById("status").textContent =
+            (data.rowCount ?? results.length) + " records found";
+
+        document.getElementById("generatedSql").textContent =
+            data.sql || "SQL information unavailable";
+
+        const header = document.getElementById("tableHeader");
+        const body = document.getElementById("tableBody");
+        const emptyMessage = document.getElementById("emptyMessage");
+
+        header.replaceChildren();
+        body.replaceChildren();
+
+        emptyMessage.classList.add("hidden");
+
+        if (results.length === 0) {
+
+            emptyMessage.classList.remove("hidden");
+            document.getElementById("resultCard").classList.remove("hidden");
+            return;
+        }
+
+        const columns = Object.keys(results[0]);
+
+        const headerRow = document.createElement("tr");
+
+        columns.forEach(column => {
+
+            const th = document.createElement("th");
+
+            th.textContent = column.replaceAll("_", " ");
+
+            headerRow.appendChild(th);
+
+        });
+
+        header.appendChild(headerRow);
+
+        results.forEach(result => {
+
+            const row = document.createElement("tr");
+
+            columns.forEach(column => {
+
+                const cell = document.createElement("td");
+                const value = result[column];
+
+                cell.textContent =
+                    value === null || value === undefined
+                        ? ""
+                        : typeof value === "object"
+                            ? JSON.stringify(value)
+                            : value;
+
+                row.appendChild(cell);
+
+            });
+
+            body.appendChild(row);
+
+        });
+
+        document.getElementById("resultCard").classList.remove("hidden");
+    }
+
+    document.getElementById("question").addEventListener(
+        "keydown",
+        function(event) {
+
+            if (event.key === "Enter") {
+                askQuestion();
+            }
+
+        }
+    );
+
+</script>
+
+</body>
+</html>
